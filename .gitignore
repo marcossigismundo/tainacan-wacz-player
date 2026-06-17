@@ -1,0 +1,11 @@
+# Composer (dev deps) — note: assets/vendor/ is the bundled ReplayWeb.page and IS committed.
+/vendor/
+composer.lock
+
+# Node
+/node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

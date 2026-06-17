@@ -1,0 +1,30 @@
+{
+    "name": "marcossigismundo/tainacan-wacz-player",
+    "description": "Renders .wacz / .warc web archives attached to Tainacan items on the public item page, using a locally bundled ReplayWeb.page viewer (no CDN).",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Marcos Sigismundo",
+            "homepage": "https://github.com/marcossigismundo"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "wp-coding-standards/wpcs": "^3.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "automattic/vipwpcs": "^3.0",
+        "phpcsstandards/phpcsextra": "^1.2"
+    },
+    "scripts": {
+        "lint": "phpcs --standard=phpcs.xml.dist",
+        "lint-fix": "phpcbf --standard=phpcs.xml.dist"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}

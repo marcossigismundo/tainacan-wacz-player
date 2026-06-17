@@ -1,0 +1,18 @@
+# ReplayWeb.page service worker — same-origin hosting.
+#
+# With the default vendored layout the worker is registered at
+#   assets/vendor/replaywebpage/replay/sw.js
+# and therefore claims only the ./replay/ scope, which browsers allow WITHOUT
+# any special header. So the player works out of the box on Apache.
+#
+# The header below is OPTIONAL hardening: it lets the worker claim a broader
+# scope if you ever relocate it (for example, to serve the replay frame from
+# the site root). It is harmless when unused. Requires Apache mod_headers.
+#
+# On Nginx, add instead, inside the matching location block:
+#   add_header Service-Worker-Allowed "/";
+<IfModule mod_headers.c>
+	<FilesMatch "sw\.js$">
+		Header set Service-Worker-Allowed "/"
+	</FilesMatch>
+</IfModule>
