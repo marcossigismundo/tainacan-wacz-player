@@ -59,8 +59,9 @@ fails, the configurable default (`/`) is used.
 
 | Purpose | Hook / API |
 | --- | --- |
-| Inject the player on the public page | `add_filter( 'the_content', …, 20 )` — runs **after** Tainacan's own `the_content` override (priority 10), so `$content` already contains the rendered Attachments section and the player is appended below it. |
-| Optional manual placement (FSE/block themes) | `register_block_type( 'wacz-player/inline', [ 'render_callback' => … ] )` |
+| Inject the player on the **official Tainacan theme** (tainacan-interface / `tainacan-theme`) | `add_action( 'tainacan-interface-single-item-after-attachments', … )` — the theme renders the item with its own template (`tainacan/single-items.php`) and fires this action **right below the Attachments section**. This is the case for the Memorial site. |
+| Inject the player when Tainacan renders the **default** single-item content | `add_filter( 'tainacan_single_item_content', …, 20, 2 )` — Tainacan core builds Document/Metadata/Attachments and applies this filter at the end, with the Attachments section already included, so the player is appended after it. |
+| Optional manual placement (FSE/block themes, or custom themes) | `register_block_type( 'wacz-player/inline', [ 'render_callback' => … ] )` |
 | Settings page in the Tainacan menu | A class extending `\Tainacan\Pages`, registered with `add_submenu_page( $this->tainacan_root_menu_slug, …, 'read', …, 80 )` — see the [Tainacan admin-pages docs](https://tainacan.github.io/tainacan-wiki/#/dev/creating-tainacan-admin-pages). |
 | Optional player in the item-edit "Document" area | `tainacan_register_admin_hook( 'item', …, 'end-left' )` (only when the API exists) |
 

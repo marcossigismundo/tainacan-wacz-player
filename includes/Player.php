@@ -31,6 +31,14 @@ class Player {
 	private $assets;
 
 	/**
+	 * Item IDs already rendered this request (guards against double injection
+	 * when more than one injection hook fires for the same item).
+	 *
+	 * @var array<int,bool>
+	 */
+	private $rendered = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Assets $assets Assets manager.
@@ -40,48 +48,79 @@ class Player {
 	}
 
 	/**
-	 * Registers the front-end hook.
+	 * Registers the front-end injection hooks.
 	 *
-	 * Priority 20 runs after Tainacan's own the_content override (priority 10),
-	 * so $content already contains the rendered Attachments section and we
-	 * simply append our player below it.
+	 * Two complementary hooks cover the two ways Tainacan renders a single item;
+	 * a per-request guard ($this->rendered) prevents a double injection if both
+	 * ever fire for the same item:
+	 *
+	 *  1. tainacan-interface-single-item-after-attachments — fired by the
+	 *     official Tainacan theme (tainacan-interface / tainacan-theme), which
+	 *     renders the item with its own template (tainacan/single-items.php).
+	 *     It fires right below the Attachments section. This is the case for the
+	 *     Memorial site. The action carries no args; the item is in The Loop.
+	 *
+	 *  2. tainacan_single_item_content — applied by Tainacan core's default
+	 *     single-item content builder (used when the theme does NOT provide its
+	 *     own template, via the the_content override). $content already includes
+	 *     the Attachments section, so the player is appended after it.
+	 *
+	 * Block themes (FSE) use the wacz-player/inline Gutenberg block instead.
 	 *
 	 * @return void
 	 */
 	public function register_hooks() {
-		add_filter( 'the_content', array( $this, 'append_player' ), 20 );
+		add_action( 'tainacan-interface-single-item-after-attachments', array( $this, 'render_after_attachments' ) );
+		add_filter( 'tainacan_single_item_content', array( $this, 'filter_single_item_content' ), 20, 2 );
 	}
 
 	/**
-	 * Appends the player markup after the item content on single item pages.
+	 * Action callback for the tainacan-interface theme: echoes the player right
+	 * below the Attachments section. Runs inside The Loop, so the current post
+	 * is the item.
 	 *
-	 * @param string $content The post content rendered so far.
+	 * @return void
+	 */
+	public function render_after_attachments() {
+		$options = Plugin::get_options();
+		if ( ! $options['autoinject'] ) {
+			return;
+		}
+		$item_id = (int) get_the_ID();
+		if ( $item_id <= 0 || isset( $this->rendered[ $item_id ] ) ) {
+			return;
+		}
+		$html = $this->render_for_item( $item_id );
+		if ( '' === $html ) {
+			return;
+		}
+		$this->rendered[ $item_id ] = true;
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markup is escaped at every output point inside Player::render_section().
+	}
+
+	/**
+	 * Filter callback for Tainacan's default single-item content. Appends the
+	 * player after $content, which already includes the Attachments section.
+	 *
+	 * @param string $content The single-item HTML built by Tainacan core.
+	 * @param mixed  $item    The Tainacan item entity (\Tainacan\Entities\Item).
 	 * @return string
 	 */
-	public function append_player( $content ) {
-		if ( is_admin() || is_feed() || is_embed() ) {
-			return $content;
-		}
-		if ( ! is_singular() || ! is_main_query() || ! in_the_loop() ) {
-			return $content;
-		}
-
-		$post = get_queried_object();
-		if ( ! ( $post instanceof \WP_Post ) || ! $this->is_tainacan_item( $post ) ) {
-			return $content;
-		}
-
+	public function filter_single_item_content( $content, $item = null ) {
 		$options = Plugin::get_options();
 		if ( ! $options['autoinject'] ) {
 			return $content;
 		}
-
-		$player = $this->render_for_item( $post->ID );
-		if ( '' === $player ) {
+		$item_id = ( is_object( $item ) && method_exists( $item, 'get_id' ) ) ? (int) $item->get_id() : (int) get_the_ID();
+		if ( $item_id <= 0 || isset( $this->rendered[ $item_id ] ) ) {
 			return $content;
 		}
-
-		return $content . $player;
+		$html = $this->render_for_item( $item_id );
+		if ( '' === $html ) {
+			return $content;
+		}
+		$this->rendered[ $item_id ] = true;
+		return $content . $html;
 	}
 
 	/**
