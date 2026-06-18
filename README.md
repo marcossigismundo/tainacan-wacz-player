@@ -49,11 +49,15 @@ On every public Tainacan item page the plugin:
    </section>
    ```
 
-The **entry-point URL** (`url=`) is detected from `pages.jsonl` inside the
-`.wacz`. The archive is read **straight from the local attachment file** with
+The **entry page** is detected from `pages.jsonl` inside the `.wacz`, reading
+both the `url` **and** its `ts` (timestamp). Passing `url` without `ts` is what
+makes ReplayWeb.page report *"Archived Page Not Found"*, because `pages.jsonl` is
+its own page-list format and a page is addressed by the `(url, ts)` pair. When a
+`ts` is found, the player opens that page directly (`url=` + `ts=`); when it is
+not, the `url` is omitted so ReplayWeb.page shows its always-navigable page list
+instead. The archive is read **straight from the local attachment file** with
 `ZipArchive` (only the small `pages.jsonl` member is inflated — a 100 MB+ archive
-is *not* fully unzipped), and the result is cached in post meta. If detection
-fails, the configurable default (`/`) is used.
+is *not* fully unzipped), and the result is cached in post meta.
 
 ## Hooks used
 

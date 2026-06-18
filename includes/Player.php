@@ -298,10 +298,33 @@ class Player {
 		$filename = wp_basename( (string) get_attached_file( $att->ID ) );
 		$source   = FileServer::url( $att->ID, $filename );
 
-		$label       = $this->attachment_label( $att );
-		$entry_url   = $this->detect_entry_url( $att->ID, $options['default_entry_url'] );
+		$label     = $this->attachment_label( $att );
+		$entry     = $this->detect_entry( $att->ID );
+		$entry_url = $entry['url'];
+		$entry_ts  = $entry['ts'];
+
+		// A url WITHOUT a ts is exactly what fails as "Archived Page Not Found",
+		// so only force a starting page when we also have its timestamp. Without
+		// it, omit url and let ReplayWeb.page show its (always-navigable) page
+		// list built from pages.jsonl. An explicit, non-default admin override of
+		// the entry URL is still honoured.
+		if ( '' === $entry_ts ) {
+			$default   = (string) $options['default_entry_url'];
+			$entry_url = ( '' !== $default && '/' !== $default ) ? $default : '';
+		}
 		$replay_base = TWACZ_PLUGIN_URL . 'assets/vendor/replaywebpage/replay/';
 		$height      = (int) $options['height'];
+
+		// Only emit url/ts when known; an empty pair would re-trigger the
+		// "Archived Page Not Found" case instead of the page list. Each value is
+		// escaped here, where the attribute string is built.
+		$entry_attrs = '';
+		if ( '' !== $entry_url ) {
+			$entry_attrs .= ' url="' . esc_url( $entry_url ) . '"';
+		}
+		if ( '' !== $entry_ts ) {
+			$entry_attrs .= ' ts="' . esc_attr( $entry_ts ) . '"';
+		}
 
 		if ( $total > 1 && '' !== $label ) {
 			/* translators: %s: web-archive file name. */
@@ -326,8 +349,7 @@ class Player {
 
 			<replay-web-page
 				class="twp-replay"
-				source="<?php echo esc_url( $source ); ?>"
-				url="<?php echo esc_url( $entry_url ); ?>"
+				source="<?php echo esc_url( $source ); ?>"<?php echo $entry_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- url/ts are escaped with esc_url()/esc_attr() where $entry_attrs is built above. ?>
 				replayBase="<?php echo esc_url( $replay_base ); ?>"
 				style="height: <?php echo esc_attr( (string) $height ); ?>px;">
 			</replay-web-page>
@@ -362,26 +384,38 @@ class Player {
 	}
 
 	/**
-	 * Detects the snapshot entry-point URL from the .wacz's pages.jsonl.
+	 * Detects the snapshot entry page (url + timestamp) from the .wacz's
+	 * pages.jsonl.
 	 *
-	 * Reads the single pages.jsonl entry straight from the local attachment
-	 * file with ZipArchive (the central directory is parsed and only that one
-	 * member is inflated, so a 100 MB+ archive is not fully unzipped). The
-	 * result is cached in post meta because a .wacz is immutable. No HTTP and
-	 * no file_get_contents() are involved — the file is on disk.
+	 * Reads pages.jsonl straight from the local attachment file with ZipArchive
+	 * (only that one small member is inflated, so a 100 MB+ archive is not fully
+	 * unzipped). pages.jsonl is ReplayWeb.page's own page-list format, so a
+	 * (url, ts) pair taken from it is guaranteed to be loadable — passing the url
+	 * WITHOUT the ts is what triggers "Archived Page Not Found". The result is
+	 * cached as JSON in post meta because a .wacz is immutable. No HTTP and no
+	 * file_get_contents() are involved — the file is on disk.
 	 *
-	 * @param int    $att_id  Attachment ID.
-	 * @param string $fallback Fallback entry URL.
-	 * @return string
+	 * @param int $att_id Attachment ID.
+	 * @return array{url:string,ts:string}
 	 */
-	private function detect_entry_url( $att_id, $fallback ) {
+	private function detect_entry( $att_id ) {
 		$cached = get_post_meta( $att_id, self::ENTRY_META, true );
 		if ( is_string( $cached ) && '' !== $cached ) {
-			return $cached;
+			$data = json_decode( $cached, true );
+			if ( is_array( $data ) ) {
+				return array(
+					'url' => ( isset( $data['url'] ) && is_string( $data['url'] ) ) ? $data['url'] : '',
+					'ts'  => ( isset( $data['ts'] ) && is_string( $data['ts'] ) ) ? $data['ts'] : '',
+				);
+			}
 		}
 
-		$entry = $fallback;
-		$path  = get_attached_file( $att_id );
+		$entry = array(
+			'url' => '',
+			'ts'  => '',
+		);
+
+		$path = get_attached_file( $att_id );
 
 		if ( is_string( $path ) && '' !== $path && file_exists( $path ) && class_exists( 'ZipArchive' ) ) {
 			$zip = new \ZipArchive();
@@ -389,9 +423,9 @@ class Player {
 				foreach ( array( 'pages/pages.jsonl', 'pages.jsonl' ) as $member ) {
 					$contents = $zip->getFromName( $member );
 					if ( is_string( $contents ) && '' !== $contents ) {
-						$found = $this->first_url_from_jsonl( $contents );
-						if ( '' !== $found ) {
-							$entry = $found;
+						$page = $this->first_page_from_jsonl( $contents );
+						if ( '' !== $page['url'] ) {
+							$entry = $page;
 							break;
 						}
 					}
@@ -400,24 +434,29 @@ class Player {
 			}
 		}
 
-		update_post_meta( $att_id, self::ENTRY_META, $entry );
+		update_post_meta( $att_id, self::ENTRY_META, wp_json_encode( $entry ) );
 		return $entry;
 	}
 
 	/**
-	 * Returns the first `url` value found in a JSONL document.
+	 * Returns the first page (url + normalized ts) from a JSONL document.
 	 *
 	 * Each line is validated as a JSON object with a non-empty string `url`
 	 * before use (schema check, per project standards). The first JSONL line is
 	 * often a format header with no `url`, which is skipped.
 	 *
 	 * @param string $contents Raw pages.jsonl contents.
-	 * @return string Entry URL, or '' when none is found.
+	 * @return array{url:string,ts:string}
 	 */
-	private function first_url_from_jsonl( $contents ) {
+	private function first_page_from_jsonl( $contents ) {
+		$result = array(
+			'url' => '',
+			'ts'  => '',
+		);
+
 		$lines = preg_split( '/\r\n|\r|\n/', $contents );
 		if ( ! is_array( $lines ) ) {
-			return '';
+			return $result;
 		}
 		foreach ( $lines as $line ) {
 			$line = trim( $line );
@@ -426,9 +465,36 @@ class Player {
 			}
 			$data = json_decode( $line, true );
 			if ( is_array( $data ) && isset( $data['url'] ) && is_string( $data['url'] ) && '' !== $data['url'] ) {
-				return $data['url'];
+				$result['url'] = $data['url'];
+				if ( isset( $data['ts'] ) && is_string( $data['ts'] ) && '' !== $data['ts'] ) {
+					$result['ts'] = $this->normalize_ts( $data['ts'] );
+				}
+				return $result;
 			}
 		}
-		return '';
+		return $result;
+	}
+
+	/**
+	 * Normalizes a pages.jsonl timestamp to the 14-digit YYYYMMDDHHMMSS form
+	 * ReplayWeb.page expects in its `ts` attribute.
+	 *
+	 * The pages.jsonl format usually stores an ISO-8601 UTC timestamp (e.g.
+	 * 2021-08-09T12:01:44Z), whose digits already form the 14-digit value.
+	 * Anything else is parsed and reformatted in UTC.
+	 *
+	 * @param string $ts Raw timestamp.
+	 * @return string 14-digit timestamp, or '' if it cannot be parsed.
+	 */
+	private function normalize_ts( $ts ) {
+		$digits = preg_replace( '/\D/', '', $ts );
+		if ( is_string( $digits ) && 14 === strlen( $digits ) ) {
+			return $digits;
+		}
+		$time = strtotime( $ts );
+		if ( false === $time ) {
+			return '';
+		}
+		return gmdate( 'YmdHis', $time );
 	}
 }
