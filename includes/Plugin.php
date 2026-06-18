@@ -108,6 +108,12 @@ class Plugin {
 		// (which already includes the Attachments section).
 		$this->player->register_hooks();
 
+		// Same-origin, Range-capable streamer for the .wacz/.warc files, so the
+		// player works even when the server denies direct HTTP access to the
+		// uploads sub-directory where DIP objects are stored.
+		$file_server = new FileServer();
+		$file_server->register_hooks();
+
 		// Optional Gutenberg block for FSE / manual placement.
 		add_action( 'init', array( new WaczInlineBlock( $this->player ), 'register' ) );
 

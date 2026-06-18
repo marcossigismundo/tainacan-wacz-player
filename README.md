@@ -130,8 +130,39 @@ HTTP the plugin hides the player and shows a **download** fallback instead.
 ### CORS
 
 Because the `.wacz` and the player are served from the **same WordPress origin**,
-there is **no CORS** to configure. (Apache already sends `Accept-Ranges: bytes`,
-so large archives load progressively.)
+there is **no CORS** to configure.
+
+### 403 Forbidden on the .wacz file (DIP objects directory)
+
+Some servers deny direct HTTP access to the uploads sub-directory where the DIP
+Importer stores its objects (`wp-content/uploads/tainacan-dip-objects/`) — often
+a leftover blocking `.htaccess` from an older importer version. The browser then
+shows `Unexpected Loading Error … status: 403` inside the player.
+
+The plugin works around this on its own: instead of pointing the player at the
+raw uploads URL, it streams the archive through a **same-origin PHP endpoint**
+(`?twacz_file=<attachment_id>`) that reads the file from disk — bypassing the
+web-server access rule — and serves it with full HTTP **Range** support. The
+endpoint only ever serves `.wacz`/`.warc` files confined to the uploads
+directory, and only when the parent item is publicly viewable (or the user may
+read it), so it is more restrictive than a raw uploads URL.
+
+If you'd rather fix it at the source, replace the contents of
+`wp-content/uploads/tainacan-dip-objects/.htaccess` with:
+
+```apache
+Options -Indexes
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Allow from all
+</IfModule>
+```
+
+(Apache already sends `Accept-Ranges: bytes`, so large archives load
+progressively either way.)
 
 ## Settings
 

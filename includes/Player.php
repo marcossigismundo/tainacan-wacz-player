@@ -288,10 +288,15 @@ class Player {
 	 * @return string
 	 */
 	private function render_section( \WP_Post $att, $type, $index, $total, $options ) {
-		$source = wp_get_attachment_url( $att->ID );
-		if ( ! is_string( $source ) || '' === $source ) {
+		$direct = wp_get_attachment_url( $att->ID );
+		if ( ! is_string( $direct ) || '' === $direct ) {
 			return '';
 		}
+
+		// Serve through our same-origin PHP endpoint (Range-capable) instead of
+		// the raw uploads URL, which the server may 403 for the DIP objects dir.
+		$filename = wp_basename( (string) get_attached_file( $att->ID ) );
+		$source   = FileServer::url( $att->ID, $filename );
 
 		$label       = $this->attachment_label( $att );
 		$entry_url   = $this->detect_entry_url( $att->ID, $options['default_entry_url'] );
