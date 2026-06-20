@@ -293,10 +293,15 @@ class Player {
 			return '';
 		}
 
-		// Serve through our same-origin PHP endpoint (Range-capable) instead of
-		// the raw uploads URL, which the server may 403 for the DIP objects dir.
-		$filename = wp_basename( (string) get_attached_file( $att->ID ) );
-		$source   = FileServer::url( $att->ID, $filename );
+		// Default: the static uploads URL, served directly by the web server with
+		// native Range support (efficient, and least likely to trip a request-rate
+		// WAF). 'stream' routes through our same-origin PHP endpoint instead, for
+		// hosts that still deny direct access to the DIP objects directory.
+		if ( 'stream' === $options['source_mode'] ) {
+			$source = FileServer::url( $att->ID );
+		} else {
+			$source = $direct;
+		}
 
 		$label     = $this->attachment_label( $att );
 		$entry     = $this->detect_entry( $att->ID );

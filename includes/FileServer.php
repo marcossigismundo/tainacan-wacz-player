@@ -193,12 +193,17 @@ class FileServer {
 			ob_end_clean();
 		}
 
-		nocache_headers();
+		// A .wacz is immutable, so let the browser cache ranges (private, since
+		// access may be permission-gated) instead of re-fetching them — fewer
+		// requests means less chance of tripping a request-rate WAF.
+		$etag = '"' . md5( $file . '|' . $size . '|' . (string) filemtime( $file ) ) . '"';
 		status_header( $code );
 		header( 'Content-Type: ' . $type );
 		// Never let a browser MIME-sniff the archive bytes into executable HTML.
 		header( 'X-Content-Type-Options: nosniff' );
 		header( 'Accept-Ranges: bytes' );
+		header( 'Cache-Control: private, max-age=86400' );
+		header( 'ETag: ' . $etag );
 		header( 'Content-Length: ' . $length );
 		if ( 206 === $code ) {
 			header( 'Content-Range: bytes ' . $start . '-' . $end . '/' . $size );

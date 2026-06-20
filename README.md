@@ -139,34 +139,32 @@ there is **no CORS** to configure.
 ### 403 Forbidden on the .wacz file (DIP objects directory)
 
 Some servers deny direct HTTP access to the uploads sub-directory where the DIP
-Importer stores its objects (`wp-content/uploads/tainacan-dip-objects/`) — often
-a leftover blocking `.htaccess` from an older importer version. The browser then
+Importer stores its objects (`wp-content/uploads/tainacan-dip-objects/`) — a
+leftover blocking `.htaccess` from an older importer version. The browser then
 shows `Unexpected Loading Error … status: 403` inside the player.
 
-The plugin works around this on its own: instead of pointing the player at the
-raw uploads URL, it streams the archive through a **same-origin PHP endpoint**
-(`?twacz_file=<attachment_id>`) that reads the file from disk — bypassing the
-web-server access rule — and serves it with full HTTP **Range** support. The
-endpoint only ever serves `.wacz`/`.warc` files confined to the uploads
-directory, and only when the parent item is publicly viewable (or the user may
-read it), so it is more restrictive than a raw uploads URL.
+**File delivery (Settings):**
 
-If you'd rather fix it at the source, replace the contents of
-`wp-content/uploads/tainacan-dip-objects/.htaccess` with:
+* **Static file — default, recommended.** The player points at the normal
+  uploads URL, served directly by the web server with native Range support. To
+  make that work, the plugin **automatically restores access**: on the next
+  admin page load it writes a permissive `.htaccess` into the DIP objects
+  directory (keeping directory listing off). This is the most efficient option
+  and the least likely to be throttled.
+* **PHP streaming — fallback.** If the server still denies direct access (e.g.
+  it cannot honour the `.htaccess`), switch to this mode. The archive is then
+  streamed through a **same-origin PHP endpoint** (`?twacz_file=<attachment_id>`)
+  that reads the file from disk, with Range support and cacheable responses. The
+  endpoint only ever serves `.wacz`/`.warc` confined to the uploads directory,
+  and only when the parent item is publicly viewable (or the user may read it).
 
-```apache
-Options -Indexes
-<IfModule mod_authz_core.c>
-    Require all granted
-</IfModule>
-<IfModule !mod_authz_core.c>
-    Order allow,deny
-    Allow from all
-</IfModule>
-```
-
-(Apache already sends `Accept-Ranges: bytes`, so large archives load
-progressively either way.)
+> **Aggressive WAF / request-rate limits.** A web archive is loaded with several
+> HTTP Range requests. Hosts with a strict request-rate firewall may start
+> answering `403` after a burst (it can even block your IP for a while). Static
+> delivery keeps these as cheap static-file requests and is far less likely to
+> trip such a limit; the PHP endpoint sends long-lived cache headers for the
+> same reason. If a whole site suddenly returns `403`, your IP was likely
+> rate-limited — wait a few minutes or ask the host to relax the rule.
 
 ## Settings
 

@@ -141,6 +141,25 @@ class Settings extends \Tainacan\Pages {
 				'default'           => 1,
 			)
 		);
+		register_setting(
+			self::GROUP,
+			Plugin::OPT_SOURCE_MODE,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_source_mode' ),
+				'default'           => 'static',
+			)
+		);
+	}
+
+	/**
+	 * Sanitizes the file-delivery mode to a known value.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string 'static' or 'stream'.
+	 */
+	public function sanitize_source_mode( $value ) {
+		return ( 'stream' === $value ) ? 'stream' : 'static';
 	}
 
 	/**
@@ -251,6 +270,22 @@ class Settings extends \Tainacan\Pages {
 								<input type="checkbox" name="<?php echo esc_attr( Plugin::OPT_WARC ); ?>" value="1" <?php checked( $options['accept_warc'] ); ?> />
 								<?php esc_html_e( 'Also display raw .warc attachments (same ReplayWeb.page viewer).', 'tainacan-wacz-player' ); ?>
 							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'File delivery', 'tainacan-wacz-player' ); ?></th>
+						<td>
+							<fieldset>
+								<label>
+									<input type="radio" name="<?php echo esc_attr( Plugin::OPT_SOURCE_MODE ); ?>" value="static" <?php checked( 'static', $options['source_mode'] ); ?> />
+									<?php esc_html_e( 'Static file, served directly by the web server (recommended)', 'tainacan-wacz-player' ); ?>
+								</label><br />
+								<label>
+									<input type="radio" name="<?php echo esc_attr( Plugin::OPT_SOURCE_MODE ); ?>" value="stream" <?php checked( 'stream', $options['source_mode'] ); ?> />
+									<?php esc_html_e( 'PHP streaming (use only if the server denies direct access to the files)', 'tainacan-wacz-player' ); ?>
+								</label>
+							</fieldset>
+							<p class="description"><?php esc_html_e( 'The plugin tries to restore static access automatically. If archives still fail to load, switch to PHP streaming.', 'tainacan-wacz-player' ); ?></p>
 						</td>
 					</tr>
 				</table>

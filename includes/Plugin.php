@@ -41,6 +41,11 @@ class Plugin {
 	const OPT_WARC = 'twp_accept_raw_warc';
 
 	/**
+	 * Option name: how the archive file is delivered ('static' | 'stream').
+	 */
+	const OPT_SOURCE_MODE = 'twp_source_mode';
+
+	/**
 	 * Default player height, in pixels.
 	 */
 	const DEFAULT_HEIGHT = 700;
@@ -108,11 +113,15 @@ class Plugin {
 		// (which already includes the Attachments section).
 		$this->player->register_hooks();
 
-		// Same-origin, Range-capable streamer for the .wacz/.warc files, so the
-		// player works even when the server denies direct HTTP access to the
-		// uploads sub-directory where DIP objects are stored.
+		// Same-origin, Range-capable streamer for the .wacz/.warc files, used as
+		// a fallback when the static uploads URL is not reachable.
 		$file_server = new FileServer();
 		$file_server->register_hooks();
+
+		// Restore static (Apache-served) access to the DIP objects directory by
+		// replacing a blocking .htaccess left by older DIP Importer versions.
+		$htaccess = new Htaccess();
+		$htaccess->register_hooks();
 
 		// Optional Gutenberg block for FSE / manual placement.
 		add_action( 'init', array( new WaczInlineBlock( $this->player ), 'register' ) );
@@ -216,11 +225,17 @@ class Plugin {
 			$entry = '/';
 		}
 
+		$source_mode = (string) get_option( self::OPT_SOURCE_MODE, 'static' );
+		if ( 'stream' !== $source_mode ) {
+			$source_mode = 'static';
+		}
+
 		return array(
 			'autoinject'        => (bool) (int) get_option( self::OPT_AUTOINJECT, 1 ),
 			'height'            => $height,
 			'default_entry_url' => $entry,
 			'accept_warc'       => (bool) (int) get_option( self::OPT_WARC, 1 ),
+			'source_mode'       => $source_mode,
 		);
 	}
 }
