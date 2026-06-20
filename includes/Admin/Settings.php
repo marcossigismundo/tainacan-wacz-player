@@ -13,6 +13,7 @@
 namespace Tainacan\WaczPlayer\Admin;
 
 use Tainacan\WaczPlayer\Plugin;
+use Tainacan\WaczPlayer\Htaccess;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -58,8 +59,35 @@ class Settings extends \Tainacan\Pages {
 	public function init() {
 		parent::init();
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_post_twacz_repair', array( $this, 'handle_repair_post' ) );
 		// Viewing the page only needs `read`, but saving must stay restricted.
 		add_filter( 'option_page_capability_' . self::GROUP, array( $this, 'settings_capability' ) );
+	}
+
+	/**
+	 * Handles the "repair file access" button: rewrites the DIP objects
+	 * .htaccess and redirects back with a result flag.
+	 *
+	 * @return void
+	 */
+	public function handle_repair_post() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You are not allowed to do this.', 'tainacan-wacz-player' ) );
+		}
+		check_admin_referer( 'twacz_repair' );
+
+		$ok = ( new Htaccess() )->repair();
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'           => $this->get_page_slug(),
+					'twacz_repaired' => $ok ? '1' : '0',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	/**
@@ -236,6 +264,8 @@ class Settings extends \Tainacan\Pages {
 				</p>
 			</div>
 
+			<?php $this->maybe_render_repair_notice(); ?>
+
 			<form method="post" action="options.php">
 				<?php settings_fields( self::GROUP ); ?>
 
@@ -293,12 +323,66 @@ class Settings extends \Tainacan\Pages {
 				<?php submit_button(); ?>
 			</form>
 
+			<?php $this->render_file_access_section(); ?>
+
 			<hr />
 			<h2><?php esc_html_e( 'Why not convert .wacz to .warc?', 'tainacan-wacz-player' ); ?></h2>
 			<p>
 				<?php esc_html_e( 'A .wacz already contains the WARC records internally, plus a CDXJ index and metadata that make replay fast. ReplayWeb.page consumes .wacz natively, so converting back to .warc would only add I/O and lose the index. This plugin therefore plays the .wacz as-is.', 'tainacan-wacz-player' ); ?>
 			</p>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Renders the result notice after a repair attempt.
+	 *
+	 * @return void
+	 */
+	private function maybe_render_repair_notice() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display of a redirect result flag; no state change.
+		if ( ! isset( $_GET['twacz_repaired'] ) ) {
+			return;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display of a redirect result flag; no state change.
+		$ok = '1' === sanitize_text_field( wp_unslash( $_GET['twacz_repaired'] ) );
+		if ( $ok ) {
+			echo '<div class="notice notice-success"><p>' . esc_html__( 'File access repaired. Reload an item page — and clear the browser cache / unregister the service worker — to test.', 'tainacan-wacz-player' ) . '</p></div>';
+		} else {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'Could not write the .htaccess automatically. Your host may require manual changes — see the plugin README.', 'tainacan-wacz-player' ) . '</p></div>';
+		}
+	}
+
+	/**
+	 * Renders the "web-archive file access" diagnostic and repair button.
+	 *
+	 * @return void
+	 */
+	private function render_file_access_section() {
+		$status = ( new Htaccess() )->status();
+		?>
+		<hr />
+		<h2><?php esc_html_e( 'Web-archive file access', 'tainacan-wacz-player' ); ?></h2>
+		<?php if ( ! $status['dir_exists'] ) : ?>
+			<p class="description"><?php esc_html_e( 'The DIP objects directory was not found on this site — nothing to repair here.', 'tainacan-wacz-player' ); ?></p>
+		<?php else : ?>
+			<p>
+				<?php if ( $status['permissive'] ) : ?>
+					<strong style="color:#1a7f37;">&#10003; <?php esc_html_e( 'Direct file access looks enabled.', 'tainacan-wacz-player' ); ?></strong>
+				<?php else : ?>
+					<strong style="color:#b32d2e;">&#10007; <?php esc_html_e( 'A blocking rule is denying direct access to the archive files.', 'tainacan-wacz-player' ); ?></strong>
+				<?php endif; ?>
+			</p>
+			<p class="description"><code><?php echo esc_html( $status['dir'] ); ?></code></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'twacz_repair' ); ?>
+				<input type="hidden" name="action" value="twacz_repair" />
+				<?php submit_button( __( 'Repair file access', 'tainacan-wacz-player' ), 'secondary', 'submit', false ); ?>
+			</form>
+			<p class="description">
+				<?php esc_html_e( 'Writes a permissive .htaccess into that directory (directory listing stays off), restoring direct, Range-enabled access to the .wacz files. Works when the server honours .htaccess overrides.', 'tainacan-wacz-player' ); ?>
+			</p>
+		<?php endif; ?>
 		<?php
 	}
 }

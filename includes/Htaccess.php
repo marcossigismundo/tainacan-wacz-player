@@ -93,4 +93,51 @@ class Htaccess {
 		$chmod = defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644;
 		return (bool) $wp_filesystem->put_contents( $file, self::CONTENT, $chmod );
 	}
+
+	/**
+	 * Reports the current state of the DIP objects directory and its .htaccess,
+	 * for the settings page diagnostic.
+	 *
+	 * @return array{dir:string,dir_exists:bool,htaccess_exists:bool,permissive:bool}
+	 */
+	public function status() {
+		$uploads = wp_get_upload_dir();
+		$dir     = empty( $uploads['basedir'] ) ? '' : trailingslashit( $uploads['basedir'] ) . self::DIP_SUBDIR;
+
+		$status = array(
+			'dir'             => $dir,
+			'dir_exists'      => '' !== $dir && is_dir( $dir ),
+			'htaccess_exists' => false,
+			'permissive'      => false,
+		);
+
+		if ( ! $status['dir_exists'] ) {
+			return $status;
+		}
+
+		$file = trailingslashit( $dir ) . '.htaccess';
+		if ( ! file_exists( $file ) ) {
+			// No .htaccess at all means nothing is blocking access here.
+			$status['permissive'] = true;
+			return $status;
+		}
+
+		$status['htaccess_exists'] = true;
+
+		if ( ! function_exists( 'WP_Filesystem' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		if ( WP_Filesystem() ) {
+			global $wp_filesystem;
+			$content = $wp_filesystem ? $wp_filesystem->get_contents( $file ) : '';
+			if ( is_string( $content ) ) {
+				$blocks = ( false !== strpos( $content, 'Require all denied' ) || false !== stripos( $content, 'Deny from all' ) );
+				$grants = ( false !== strpos( $content, 'Require all granted' ) || false !== stripos( $content, 'Allow from all' ) );
+
+				$status['permissive'] = $grants && ! $blocks;
+			}
+		}
+
+		return $status;
+	}
 }
