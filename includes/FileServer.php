@@ -136,6 +136,12 @@ class FileServer {
 			if ( function_exists( 'is_post_publicly_viewable' ) && is_post_publicly_viewable( $parent_id ) ) {
 				return true;
 			}
+			// A published parent item is public-facing; its archive is too. This
+			// also covers the service worker's credential-less fetch, which would
+			// otherwise be treated as anonymous and fail the read_post check.
+			if ( 'publish' === get_post_status( $parent_id ) ) {
+				return true;
+			}
 			return current_user_can( 'read_post', $parent_id );
 		}
 		return current_user_can( 'upload_files' );

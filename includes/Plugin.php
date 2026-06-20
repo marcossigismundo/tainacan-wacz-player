@@ -225,9 +225,9 @@ class Plugin {
 			$entry = '/';
 		}
 
-		$source_mode = (string) get_option( self::OPT_SOURCE_MODE, 'static' );
-		if ( 'stream' !== $source_mode ) {
-			$source_mode = 'static';
+		$source_mode = (string) get_option( self::OPT_SOURCE_MODE, 'stream' );
+		if ( 'static' !== $source_mode ) {
+			$source_mode = 'stream';
 		}
 
 		return array(

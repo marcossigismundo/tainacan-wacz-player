@@ -148,7 +148,7 @@ class Settings extends \Tainacan\Pages {
 			array(
 				'type'              => 'string',
 				'sanitize_callback' => array( $this, 'sanitize_source_mode' ),
-				'default'           => 'static',
+				'default'           => 'stream',
 			)
 		);
 	}
@@ -280,15 +280,15 @@ class Settings extends \Tainacan\Pages {
 						<td>
 							<fieldset>
 								<label>
-									<input type="radio" name="<?php echo esc_attr( Plugin::OPT_SOURCE_MODE ); ?>" value="static" <?php checked( 'static', $options['source_mode'] ); ?> />
-									<?php esc_html_e( 'Static file, served directly by the web server (recommended)', 'tainacan-wacz-player' ); ?>
+									<input type="radio" name="<?php echo esc_attr( Plugin::OPT_SOURCE_MODE ); ?>" value="stream" <?php checked( 'stream', $options['source_mode'] ); ?> />
+									<?php esc_html_e( 'PHP streaming (recommended) — works even when the server blocks direct access to the .wacz files', 'tainacan-wacz-player' ); ?>
 								</label><br />
 								<label>
-									<input type="radio" name="<?php echo esc_attr( Plugin::OPT_SOURCE_MODE ); ?>" value="stream" <?php checked( 'stream', $options['source_mode'] ); ?> />
-									<?php esc_html_e( 'PHP streaming (use only if the server denies direct access to the files)', 'tainacan-wacz-player' ); ?>
+									<input type="radio" name="<?php echo esc_attr( Plugin::OPT_SOURCE_MODE ); ?>" value="static" <?php checked( 'static', $options['source_mode'] ); ?> />
+									<?php esc_html_e( 'Direct static file — more efficient, but only if your server serves the uploads directory directly', 'tainacan-wacz-player' ); ?>
 								</label>
 							</fieldset>
-							<p class="description"><?php esc_html_e( 'The plugin tries to restore static access automatically. If archives still fail to load, switch to PHP streaming.', 'tainacan-wacz-player' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Many hosts (or security plugins / WAFs) deny direct access to the .wacz extension or the DIP objects directory. PHP streaming bypasses that by serving the file through WordPress.', 'tainacan-wacz-player' ); ?></p>
 						</td>
 					</tr>
 				</table>

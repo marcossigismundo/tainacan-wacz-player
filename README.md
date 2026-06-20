@@ -145,18 +145,21 @@ shows `Unexpected Loading Error … status: 403` inside the player.
 
 **File delivery (Settings):**
 
-* **Static file — default, recommended.** The player points at the normal
-  uploads URL, served directly by the web server with native Range support. To
-  make that work, the plugin **automatically restores access**: on the next
-  admin page load it writes a permissive `.htaccess` into the DIP objects
-  directory (keeping directory listing off). This is the most efficient option
-  and the least likely to be throttled.
-* **PHP streaming — fallback.** If the server still denies direct access (e.g.
-  it cannot honour the `.htaccess`), switch to this mode. The archive is then
-  streamed through a **same-origin PHP endpoint** (`?twacz_file=<attachment_id>`)
-  that reads the file from disk, with Range support and cacheable responses. The
-  endpoint only ever serves `.wacz`/`.warc` confined to the uploads directory,
-  and only when the parent item is publicly viewable (or the user may read it).
+* **PHP streaming — default, recommended.** The archive is served through a
+  **same-origin PHP endpoint** (`?twacz_file=<attachment_id>`) that reads the
+  file from disk, with Range support and cacheable responses. Because the URL
+  has no `.wacz` extension and is not under the DIP objects directory, it works
+  even when the host (or a security plugin / WAF) denies direct access to the
+  `.wacz` extension or to that directory. The endpoint only ever serves
+  `.wacz`/`.warc` confined to the uploads directory, and only when the parent
+  item is publicly viewable (or the user may read it).
+* **Direct static file — opt-in, more efficient.** Points the player at the
+  normal uploads URL, served directly by the web server with native Range. Use
+  it only where the server actually serves the uploads directory. The plugin
+  also tries to restore static access by rewriting a blocking `.htaccess` left
+  in the DIP objects directory (there is a **Repair file access** button on the
+  settings page), but a host that denies access at the vhost / WAF level cannot
+  be fixed from `.htaccess`.
 
 > **Aggressive WAF / request-rate limits.** A web archive is loaded with several
 > HTTP Range requests. Hosts with a strict request-rate firewall may start
