@@ -59,35 +59,8 @@ class Settings extends \Tainacan\Pages {
 	public function init() {
 		parent::init();
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		add_action( 'admin_post_twacz_repair', array( $this, 'handle_repair_post' ) );
 		// Viewing the page only needs `read`, but saving must stay restricted.
 		add_filter( 'option_page_capability_' . self::GROUP, array( $this, 'settings_capability' ) );
-	}
-
-	/**
-	 * Handles the "repair file access" button: rewrites the DIP objects
-	 * .htaccess and redirects back with a result flag.
-	 *
-	 * @return void
-	 */
-	public function handle_repair_post() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You are not allowed to do this.', 'tainacan-wacz-player' ) );
-		}
-		check_admin_referer( 'twacz_repair' );
-
-		$ok = ( new Htaccess() )->repair();
-
-		wp_safe_redirect(
-			add_query_arg(
-				array(
-					'page'           => $this->get_page_slug(),
-					'twacz_repaired' => $ok ? '1' : '0',
-				),
-				admin_url( 'admin.php' )
-			)
-		);
-		exit;
 	}
 
 	/**

@@ -46,6 +46,34 @@ class Htaccess {
 	 */
 	public function register_hooks() {
 		add_action( 'admin_init', array( $this, 'maybe_repair' ) );
+		// Registered here (on plugins_loaded) rather than from the settings page,
+		// because admin-post.php does not fire admin_menu where that page lives.
+		add_action( 'admin_post_twacz_repair', array( $this, 'handle_repair_post' ) );
+	}
+
+	/**
+	 * Handles the "Repair file access" button submitted to admin-post.php.
+	 *
+	 * @return void
+	 */
+	public function handle_repair_post() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You are not allowed to do this.', 'tainacan-wacz-player' ) );
+		}
+		check_admin_referer( 'twacz_repair' );
+
+		$ok = $this->repair();
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'           => 'tainacan-wacz-player',
+					'twacz_repaired' => $ok ? '1' : '0',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	/**
