@@ -49,15 +49,17 @@ On every public Tainacan item page the plugin:
    </section>
    ```
 
-The **entry page** is detected from `pages.jsonl` inside the `.wacz`, reading
-both the `url` **and** its `ts` (timestamp). Passing `url` without `ts` is what
-makes ReplayWeb.page report *"Archived Page Not Found"*, because `pages.jsonl` is
-its own page-list format and a page is addressed by the `(url, ts)` pair. When a
-`ts` is found, the player opens that page directly (`url=` + `ts=`); when it is
-not, the `url` is omitted so ReplayWeb.page shows its always-navigable page list
-instead. The archive is read **straight from the local attachment file** with
-`ZipArchive` (only the small `pages.jsonl` member is inflated — a 100 MB+ archive
-is *not* fully unzipped), and the result is cached in post meta.
+**Entry page.** By default the viewer shows ReplayWeb.page's own **page list**
+(built from the archive's `pages.jsonl`), which is always navigable and never
+reports *"Archived Page Not Found"* — click the captured page to open it. Enable
+**Entry page → "Try to open the captured page automatically"** in the settings to
+open the detected page directly instead: the plugin reads both the `url` and its
+`ts` from `pages.jsonl` (a page is addressed by the `(url, ts)` pair; `url` alone
+does not resolve) straight from the local file with `ZipArchive` (only the small
+`pages.jsonl` member is inflated — a 100 MB+ archive is *not* fully unzipped),
+normalizes the `ts` to the 14-digit form ReplayWeb.page expects, and caches it.
+Auto-open is convenient but can fail on archives whose internal index is
+inconsistent, which is why it is off by default.
 
 ## Hooks used
 

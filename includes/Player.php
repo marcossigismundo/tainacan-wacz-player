@@ -303,19 +303,27 @@ class Player {
 			$source = $direct;
 		}
 
-		$label     = $this->attachment_label( $att );
-		$entry     = $this->detect_entry( $att->ID );
-		$entry_url = $entry['url'];
-		$entry_ts  = $entry['ts'];
+		$label = $this->attachment_label( $att );
 
-		// A url WITHOUT a ts is exactly what fails as "Archived Page Not Found",
-		// so only force a starting page when we also have its timestamp. Without
-		// it, omit url and let ReplayWeb.page show its (always-navigable) page
-		// list built from pages.jsonl. An explicit, non-default admin override of
-		// the entry URL is still honoured.
-		if ( '' === $entry_ts ) {
-			$default   = (string) $options['default_entry_url'];
-			$entry_url = ( '' !== $default && '/' !== $default ) ? $default : '';
+		// By default, show ReplayWeb.page's own page list (built from pages.jsonl):
+		// it is always navigable and never reports "Archived Page Not Found".
+		// The opt-in "auto open" passes the detected entry page (url + ts) so it
+		// opens directly — convenient, but it can fail on archives whose internal
+		// index is inconsistent. An explicit admin entry-URL override wins too.
+		$entry_url = '';
+		$entry_ts  = '';
+		if ( $options['auto_open'] ) {
+			$entry = $this->detect_entry( $att->ID );
+			if ( '' !== $entry['ts'] ) {
+				$entry_url = $entry['url'];
+				$entry_ts  = $entry['ts'];
+			}
+		}
+		if ( '' === $entry_url ) {
+			$default = (string) $options['default_entry_url'];
+			if ( '' !== $default && '/' !== $default ) {
+				$entry_url = $default;
+			}
 		}
 		$replay_base = TWACZ_PLUGIN_URL . 'assets/vendor/replaywebpage/replay/';
 		$height      = (int) $options['height'];

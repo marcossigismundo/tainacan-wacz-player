@@ -46,6 +46,11 @@ class Plugin {
 	const OPT_SOURCE_MODE = 'twp_source_mode';
 
 	/**
+	 * Option name: auto-open the detected entry page instead of the page list.
+	 */
+	const OPT_AUTO_OPEN = 'twp_auto_open';
+
+	/**
 	 * Default player height, in pixels.
 	 */
 	const DEFAULT_HEIGHT = 700;
@@ -236,6 +241,7 @@ class Plugin {
 			'default_entry_url' => $entry,
 			'accept_warc'       => (bool) (int) get_option( self::OPT_WARC, 1 ),
 			'source_mode'       => $source_mode,
+			'auto_open'         => (bool) (int) get_option( self::OPT_AUTO_OPEN, 0 ),
 		);
 	}
 }

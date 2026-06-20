@@ -151,6 +151,15 @@ class Settings extends \Tainacan\Pages {
 				'default'           => 'stream',
 			)
 		);
+		register_setting(
+			self::GROUP,
+			Plugin::OPT_AUTO_OPEN,
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => array( $this, 'sanitize_bool' ),
+				'default'           => 0,
+			)
+		);
 	}
 
 	/**
@@ -260,10 +269,20 @@ class Settings extends \Tainacan\Pages {
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><label for="twp_default_entry_url"><?php esc_html_e( 'Default entry-point URL', 'tainacan-wacz-player' ); ?></label></th>
+						<th scope="row"><?php esc_html_e( 'Entry page', 'tainacan-wacz-player' ); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="<?php echo esc_attr( Plugin::OPT_AUTO_OPEN ); ?>" value="1" <?php checked( $options['auto_open'] ); ?> />
+								<?php esc_html_e( 'Try to open the captured page automatically', 'tainacan-wacz-player' ); ?>
+							</label>
+							<p class="description"><?php esc_html_e( 'When off (default), the viewer shows the archive\'s navigable page list, which always works. When on, it opens the detected entry page directly — convenient, but some archives may then report "Archived Page Not Found".', 'tainacan-wacz-player' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="twp_default_entry_url"><?php esc_html_e( 'Forced entry URL (optional)', 'tainacan-wacz-player' ); ?></label></th>
 						<td>
 							<input type="text" id="twp_default_entry_url" name="<?php echo esc_attr( Plugin::OPT_ENTRY ); ?>" value="<?php echo esc_attr( $options['default_entry_url'] ); ?>" class="regular-text" />
-							<p class="description"><?php esc_html_e( 'Used when the snapshot entry point cannot be detected from the archive. Default: /', 'tainacan-wacz-player' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Advanced: open this exact URL instead of the page list. Leave as / to keep the default behavior.', 'tainacan-wacz-player' ); ?></p>
 						</td>
 					</tr>
 					<tr>
