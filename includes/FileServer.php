@@ -44,23 +44,41 @@ class FileServer {
 	}
 
 	/**
-	 * Builds the same-origin URL that streams a given attachment.
+	 * Builds the same-origin, signed URL that streams a given attachment.
 	 *
-	 * ReplayWeb.page detects the archive format by sniffing the content (it
-	 * loads extension-less presigned URLs too), so the query-var URL needs no
-	 * file extension. The original name is appended only as a hint / for nicer
-	 * download file names.
+	 * The URL carries a short-lived HMAC token. It is minted while rendering the
+	 * item page — which WordPress only shows to viewers allowed to see the item
+	 * — so the token authorizes the player's service worker to fetch the file
+	 * even though that request is credential-less (anonymous). The expiry is
+	 * coarse (day-aligned) so the URL stays stable and cacheable. ReplayWeb.page
+	 * sniffs the archive format from the content, so no file extension is needed.
 	 *
-	 * @param int    $attachment_id Attachment ID.
-	 * @param string $filename      Original file name (optional, hint only).
+	 * @param int $attachment_id Attachment ID.
 	 * @return string
 	 */
-	public static function url( $attachment_id, $filename = '' ) {
-		$args = array( self::QUERY_VAR => (int) $attachment_id );
-		if ( '' !== $filename ) {
-			$args['twacz_name'] = rawurlencode( $filename );
-		}
-		return add_query_arg( $args, home_url( '/' ) );
+	public static function url( $attachment_id ) {
+		$attachment_id = (int) $attachment_id;
+		$exp           = ( (int) floor( time() / DAY_IN_SECONDS ) + 2 ) * DAY_IN_SECONDS;
+
+		return add_query_arg(
+			array(
+				self::QUERY_VAR => $attachment_id,
+				'twacz_exp'     => $exp,
+				'twacz_sig'     => self::signature( $attachment_id, $exp ),
+			),
+			home_url( '/' )
+		);
+	}
+
+	/**
+	 * Computes the HMAC signature for a (attachment, expiry) pair.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @param int $exp           Expiry timestamp.
+	 * @return string
+	 */
+	private static function signature( $attachment_id, $exp ) {
+		return hash_hmac( 'sha256', (int) $attachment_id . '|' . (int) $exp, wp_salt( 'auth' ) );
 	}
 
 	/**
@@ -112,12 +130,35 @@ class FileServer {
 			$this->abort( 404 );
 		}
 
-		if ( ! $this->can_read( $post ) ) {
+		if ( ! $this->has_valid_token( $attachment_id ) && ! $this->can_read( $post ) ) {
 			$this->abort( 403 );
 		}
 
 		$type = ( 'warc' === $ext ) ? 'application/warc' : 'application/wacz';
 		$this->stream( $real, $type, wp_basename( $file ) );
+	}
+
+	/**
+	 * Validates the signed-URL token (HMAC over attachment id + expiry).
+	 *
+	 * Lets the player's credential-less service-worker fetch through, because the
+	 * URL was minted on an item page the viewer was already allowed to see. This
+	 * covers item "documents" (which can have no post_parent) that would
+	 * otherwise fail the capability check for anonymous visitors.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return bool
+	 */
+	private function has_valid_token( $attachment_id ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Signed-URL token (HMAC) on a read-only endpoint; verified by hash_equals below.
+		$exp = isset( $_GET['twacz_exp'] ) ? absint( wp_unslash( $_GET['twacz_exp'] ) ) : 0;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Signed-URL token (HMAC) on a read-only endpoint; verified by hash_equals below.
+		$sig = isset( $_GET['twacz_sig'] ) ? sanitize_text_field( wp_unslash( $_GET['twacz_sig'] ) ) : '';
+
+		if ( $exp <= 0 || '' === $sig || $exp < time() ) {
+			return false;
+		}
+		return hash_equals( self::signature( $attachment_id, $exp ), $sig );
 	}
 
 	/**
