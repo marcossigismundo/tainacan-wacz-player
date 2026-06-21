@@ -185,7 +185,45 @@ class FileServer {
 			}
 			return current_user_can( 'read_post', $parent_id );
 		}
+		// No post_parent: the file is likely a Tainacan item "document". Allow it
+		// when a published item references it as its document, so the player's
+		// anonymous (credential-less) fetch works without depending on the token.
+		if ( $this->is_public_item_document( $post->ID ) ) {
+			return true;
+		}
 		return current_user_can( 'upload_files' );
+	}
+
+	/**
+	 * Whether a published post references this attachment as its Tainacan
+	 * document (`_document` meta), making it public-facing.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return bool
+	 */
+	private function is_public_item_document( $attachment_id ) {
+		$public_types = get_post_types( array( 'public' => true ) );
+		if ( empty( $public_types ) ) {
+			return false;
+		}
+		$query = new \WP_Query(
+			array(
+				'post_type'              => array_values( $public_types ),
+				'post_status'            => 'publish',
+				'posts_per_page'         => 1,
+				'fields'                 => 'ids',
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'meta_query'             => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- One-off lookup keyed on the indexed meta_key `_document`; result is HTTP-cacheable.
+					array(
+						'key'   => '_document',
+						'value' => (string) (int) $attachment_id,
+					),
+				),
+			)
+		);
+		return ! empty( $query->posts );
 	}
 
 	/**
